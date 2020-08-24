@@ -7,20 +7,37 @@ using System.Threading.Tasks;
 
 namespace BassClefStudio.NET.Api
 {
-    public class ApiService<TIn> where TIn : IApiRequest
+    /// <summary>
+    /// Represents an API with multiple <see cref="IApiEndpoint"/>s which requests can be sent to.
+    /// </summary>
+    /// <typeparam name="TIn">The type of input request sent to this API.</typeparam>
+    public class ApiService<TIn>
     {
+        /// <summary>
+        /// A collection of <see cref="IApiEndpoint"/>s which the API includes.
+        /// </summary>
         public IEnumerable<IApiEndpoint> Endpoints { get; }
+
+        /// <summary>
+        /// An optional <see cref="IAuthProvider{T}"/> which can authenticate requests.
+        /// </summary>
         public IAuthProvider<TIn> AuthProvider { get; private set; }
 
+        /// <summary>
+        /// Creates a new <see cref="ApiService{TIn}"/>.
+        /// </summary>
+        /// <param name="endPoints">A collection of <see cref="IApiEndpoint"/>s which the API includes.</param>
         public ApiService(IEnumerable<IApiEndpoint> endPoints)
         {
             Endpoints = endPoints;
         }
 
-        public void SignIn(IAuthProvider<TIn> auth) => AuthProvider = auth;
-
-        public void SignOut() => AuthProvider = null;
-
+        /// <summary>
+        /// Sends the given request to the <see cref="IApiEndpoint"/> in the <see cref="ApiService{TIn}"/> with the given <paramref name="name"/>.
+        /// </summary>
+        /// <typeparam name="TOut">The type of response to receive, and therefore the type of <see cref="IApiEndpoint{TIn, TOut}"/> which can handle the request.</typeparam>
+        /// <param name="request">The <typeparamref name="TIn"/> request to send.</param>
+        /// <param name="name">The name of the <see cref="IApiEndpoint"/> to send it to.</param>
         public async Task<TOut> SendRequestAsync<TOut>(TIn request, string name)
         {
             var endpoint = Endpoints.OfType<IApiEndpoint<TIn, TOut>>().FirstOrDefault(a => a.Name == name);

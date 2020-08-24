@@ -4,7 +4,11 @@ using System.Text;
 
 namespace BassClefStudio.NET.Api.Authentication
 {
-    public interface IAuthProvider<T> where T : IApiRequest
+    /// <summary>
+    /// Represents a service that can provide authentication to an request.
+    /// </summary>
+    /// <typeparam name="T">The types of requests this <see cref="IAuthProvider{T}"/> supports.</typeparam>
+    public interface IAuthProvider<in T>
     {
         void Authenticate(T request);
     }
