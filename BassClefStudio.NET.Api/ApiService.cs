@@ -1,57 +1,244 @@
-﻿using BassClefStudio.NET.Api.Authentication;
+﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace BassClefStudio.NET.Api
 {
-    /// <summary>
-    /// Represents an API with multiple <see cref="IApiEndpoint"/>s which requests can be sent to.
-    /// </summary>
-    /// <typeparam name="TIn">The type of input request sent to this API.</typeparam>
-    public class ApiService<TIn>
+    public class ApiService
     {
-        /// <summary>
-        /// A collection of <see cref="IApiEndpoint"/>s which the API includes.
-        /// </summary>
-        public IEnumerable<IApiEndpoint> Endpoints { get; }
+        public IAccount<HttpRequestMessage> Account { get; set; }
 
-        /// <summary>
-        /// An optional <see cref="IAuthProvider{T}"/> which can authenticate requests.
-        /// </summary>
-        public IAuthProvider<TIn> AuthProvider { get; private set; }
-
-        /// <summary>
-        /// Creates a new <see cref="ApiService{TIn}"/>.
-        /// </summary>
-        /// <param name="endPoints">A collection of <see cref="IApiEndpoint"/>s which the API includes.</param>
-        public ApiService(IEnumerable<IApiEndpoint> endPoints)
+        private HttpClient client;
+        private HttpClient Client
         {
-            Endpoints = endPoints;
+            get
+            {
+                if (client == null)
+                {
+                    client = new HttpClient();
+                }
+                return client;
+            }
         }
 
         /// <summary>
-        /// Sends the given request to the <see cref="IApiEndpoint"/> in the <see cref="ApiService{TIn}"/> with the given <paramref name="name"/>.
+        /// Creates an <see cref="ApiService"/> with authentication from a given <paramref name="account"/>.
         /// </summary>
-        /// <typeparam name="TOut">The type of response to receive, and therefore the type of <see cref="IApiEndpoint{TIn, TOut}"/> which can handle the request.</typeparam>
-        /// <param name="request">The <typeparamref name="TIn"/> request to send.</param>
-        /// <param name="name">The name of the <see cref="IApiEndpoint"/> to send it to.</param>
-        public async Task<TOut> SendRequestAsync<TOut>(TIn request, string name)
+        /// <param name="account">The account provided for authentication.</param>
+        public ApiService(IAccount<HttpRequestMessage> account)
         {
-            var endpoint = Endpoints.OfType<IApiEndpoint<TIn, TOut>>().FirstOrDefault(a => a.Name == name);
-            if (endpoint != null)
+            Account = account;
+        }
+
+        /// <summary>
+        /// Creates an <see cref="ApiService"/> with no authentication.
+        /// </summary>
+        public ApiService()
+        {
+            Account = null;
+        }
+
+        /// <summary>
+        /// Sends a GET request to a given API and returns the result as a JSON object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a .NET object (serialized to JSON).</param>
+        /// <param name="encodeData">A <see cref="bool"/> value indicating whether the JSON content should be URL-encoded.</param>
+        public async Task<JToken> GetAsync(string endpoint, object content, bool encodeData = true)
+            => await GetAsync(endpoint, encodeData ? JToken.FromObject(content).ToString() : Uri.EscapeDataString(JToken.FromObject(content).ToString()));
+
+        /// <summary>
+        /// Sends a GET request to a given API and returns the result as a JSON object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a JSON object.</param>
+        public async Task<JToken> GetAsync(string endpoint, string content = null)
+        {
+            HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            if (content != null)
             {
-                if (AuthProvider != null)
+                message.Content = new StringContent(content, Encoding.UTF8, "application/json");
+            }
+            Account?.Authenticate(message);
+            var result = await Client.SendAsync(message);
+            if (result.IsSuccessStatusCode)
+            {
+                try
                 {
-                    AuthProvider.Authenticate(request);
+                    return JToken.Parse(await result.Content.ReadAsStringAsync());
                 }
-                return await endpoint.SendRequestAsync(request);
+                catch
+                {
+                    return null;
+                }
             }
             else
             {
-                return default(TOut);
+                throw new ApiException(result.StatusCode, result.ReasonPhrase, await result.Content.ReadAsStringAsync());
+            }
+        }
+
+        /// <summary>
+        /// Sends a GET request to a given API and returns the result as a .NET object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a .NET object (serialized to JSON).</param>
+        /// <param name="encodeData">A <see cref="bool"/> value indicating whether the JSON content should be URL-encoded.</param>
+        public async Task<T> GetAsync<T>(string endpoint, object content, bool encodeData = true)
+            => await GetAsync<T>(endpoint, encodeData ? JToken.FromObject(content).ToString() : Uri.EscapeDataString(JToken.FromObject(content).ToString()));
+
+        /// <summary>
+        /// Sends a GET request to a given API and returns the result as a .NET object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a JSON object.</param>
+        public async Task<T> GetAsync<T>(string endpoint, string content = null)
+        {
+            var result = await GetAsync(endpoint, content);
+            if (result != null)
+            {
+                return result.ToObject<T>();
+            }
+            else
+            {
+                return default(T);
+            }
+        }
+
+        /// <summary>
+        /// Sends a POST request to a given API and returns the result as a JSON object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a .NET object (serialized to JSON).</param>
+        /// <param name="encodeData">A <see cref="bool"/> value indicating whether the JSON content should be URL-encoded.</param>
+        public async Task<JToken> PostAsync(string endpoint, object content, bool encodeData = true)
+            => await PostAsync(endpoint, encodeData ? JToken.FromObject(content).ToString() : Uri.EscapeDataString(JToken.FromObject(content).ToString()));
+
+        /// <summary>
+        /// Sends a POST request to a given API and returns the result as a JSON object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a JSON object.</param>
+        public async Task<JToken> PostAsync(string endpoint, string content = null)
+        {
+            HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            if (content != null)
+            {
+                message.Content = new StringContent(content, Encoding.UTF8, "application/json");
+            }
+            Account?.Authenticate(message);
+            var result = await Client.SendAsync(message);
+            if (result.IsSuccessStatusCode)
+            {
+                try
+                {
+                    return JToken.Parse(await result.Content.ReadAsStringAsync());
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                throw new ApiException(result.StatusCode, result.ReasonPhrase, await result.Content.ReadAsStringAsync());
+            }
+        }
+
+        /// <summary>
+        /// Sends a POST request to a given API and returns the result as a .NET object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a .NET object (serialized to JSON).</param>
+        /// <param name="encodeData">A <see cref="bool"/> value indicating whether the JSON content should be URL-encoded.</param>
+        public async Task<T> PostAsync<T>(string endpoint, object content, bool encodeData = true)
+            => await PostAsync<T>(endpoint, encodeData ? JToken.FromObject(content).ToString() : Uri.EscapeDataString(JToken.FromObject(content).ToString()));
+
+        /// <summary>
+        /// Sends a GET request to a given API and returns the result as a .NET object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a JSON object.</param>
+        public async Task<T> PostAsync<T>(string endpoint, string content = null)
+        {
+            var result = await PostAsync(endpoint, content);
+            if (result != null)
+            {
+                return result.ToObject<T>();
+            }
+            else
+            {
+                return default(T);
+            }
+        }
+
+        /// <summary>
+        /// Sends a DELETE request to a given API and returns the result as a JSON object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a .NET object (serialized to JSON).</param>
+        /// <param name="encodeData">A <see cref="bool"/> value indicating whether the JSON content should be URL-encoded.</param>
+        public async Task<JToken> DeleteAsync(string endpoint, object content, bool encodeData = true)
+            => await DeleteAsync(endpoint, encodeData ? JToken.FromObject(content).ToString() : Uri.EscapeDataString(JToken.FromObject(content).ToString()));
+
+        /// <summary>
+        /// Sends a DELETE request to a given API and returns the result as a JSON object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a JSON object.</param>
+        public async Task<JToken> DeleteAsync(string endpoint, string content = null)
+        {
+            HttpRequestMessage message = new HttpRequestMessage(HttpMethod.Delete, endpoint);
+            if (content != null)
+            {
+                message.Content = new StringContent(content, Encoding.UTF8, "application/json");
+            }
+            Account?.Authenticate(message);
+            var result = await Client.SendAsync(message);
+            if (result.IsSuccessStatusCode)
+            {
+                try
+                {
+                    return JToken.Parse(await result.Content.ReadAsStringAsync());
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+            else
+            {
+                throw new ApiException(result.StatusCode, result.ReasonPhrase, await result.Content.ReadAsStringAsync());
+            }
+        }
+
+        /// <summary>
+        /// Sends a DELETE request to a given API and returns the result as a .NET object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a .NET object (serialized to JSON).</param>
+        /// <param name="encodeData">A <see cref="bool"/> value indicating whether the JSON content should be URL-encoded.</param>
+        public async Task<T> DeleteAsync<T>(string endpoint, object content, bool encodeData = true)
+            => await DeleteAsync<T>(endpoint, encodeData ? JToken.FromObject(content).ToString() : Uri.EscapeDataString(JToken.FromObject(content).ToString()));
+
+        /// <summary>
+        /// Sends a DELETE request to a given API and returns the result as a .NET object.
+        /// </summary>
+        /// <param name="endpoint">The endpoint to send the request.</param>
+        /// <param name="content">Any content included in the request as a JSON object.</param>
+        public async Task<T> DeleteAsync<T>(string endpoint, string content = null)
+        {
+            var result = await DeleteAsync(endpoint, content);
+            if (result != null)
+            {
+                return result.ToObject<T>();
+            }
+            else
+            {
+                return default(T);
             }
         }
     }
