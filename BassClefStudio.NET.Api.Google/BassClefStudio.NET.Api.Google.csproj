@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="BassClefStudio.NET.Core" Version="1.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\BassClefStudio.NET.Api\BassClefStudio.NET.Api.csproj" />
   </ItemGroup>
 
