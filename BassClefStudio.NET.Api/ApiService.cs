@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace BassClefStudio.NET.Api
 {
-    public class ApiService
+    public class ApiService : IDisposable
     {
         public IAccount<HttpRequestMessage> Account { get; set; }
 
@@ -239,6 +239,15 @@ namespace BassClefStudio.NET.Api
             else
             {
                 return default(T);
+            }
+        }
+
+        /// <inheritdoc/>
+        public void Dispose()
+        {
+            if(Client != null)
+            {
+                Client.Dispose();
             }
         }
     }

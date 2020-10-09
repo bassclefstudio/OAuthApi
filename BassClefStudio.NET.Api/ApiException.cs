@@ -9,6 +9,7 @@ namespace BassClefStudio.NET.Api
     public class ApiException : Exception
     {
         public ApiException() { }
+        public ApiException(string message) : base(message) { }
         public ApiException(HttpStatusCode errorCode, string message, string data) : base($"The API call returned the following error:\r\nError code {errorCode}: {message}\r\n{data}") { }
     }
 }

@@ -2,6 +2,15 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard1.4</TargetFramework>
+    <Authors>BassClefStudio</Authors>
+    <Description>Microsoft Graph support for the BassClefStudio.NET.Api library, including models and extension methods for ApiService.</Description>
+    <RepositoryUrl>https://github.com/bassclefstudio/OAuthApi.git</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/bassclefstudio/OAuthApi</PackageProjectUrl>
+    <Version>1.0.1</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DocumentationFile>C:\Users\deckl\OneDrive\Decklan Cloud\Development\.NET\Base Libraries\BassClefStudio.OAuthApi\BassClefStudio.NET.Api.Graph\BassClefStudio.NET.Api.Graph.xml</DocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
